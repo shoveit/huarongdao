@@ -1,6 +1,6 @@
 #!/usr/bin/swipl
 :- style_check(-singleton).
-%:- initialization main.
+:- initialization main.
 :- set_prolog_flag(verbose, silent).
 :- use_module(library(csv)).
 
@@ -12,9 +12,6 @@ interference(app_1919,app_8017,1) .
 %%==> scheduling_preliminary_instance_deploy_20180606.csv <==
 deploy(inst_23673,app_1919,machine_4959) .
 deploy(inst_23672,app_8017,machine_4959) .
-%%==> scheduling_preliminary_machine_resources_20180606.csv <==
-machine(machine_4959,3,64,6,7,3,7) .
-machine(machine_1919,32,64,6,7,3,7) .
 
 %%==> scheduling_preliminary_app_resources_20180606.csv <==
 app_resource(App,cpu,CPU) :- app(App,L), findall(E,(nth1(I,L,E),I>=1,I=<98),CPU) .
@@ -23,6 +20,10 @@ app_resource(App,disk,Disk) :- app(App,L), nth1(197,L,Disk) .
 app_resource(App,m,M) :- app(App,L), nth1(198,L,M) .
 app_resource(App,p,P) :- app(App,L), nth1(199,L,P) .
 app_resource(App,mp,MP) :- app(App,L), nth1(200,L,MP) .
+
+%%==> scheduling_preliminary_machine_resources_20180606.csv <==
+machine(machine_4959,3,64,6,7,3,7) .
+machine(machine_1919,32,64,6,7,3,7) .
 
 %%--- property slicer & selector from original machine(x,x,x,x,x,x).
 machine_resource(Machine,cpu,CPU) :- machine(Machine,CPU,_,_,_,_,_) .
@@ -81,8 +82,8 @@ machine_overload(Machine,Resource,Overload) :-
 	machine_load(Machine,Resource,Load),
 	machine_resource(Machine,Resource,Xmax),
 	(
-		(is_list(Load), \+ forall(member(X,Load), X < Xmax)) -> vector_minus1(Load,Xmax,Overload) ;
-		Overload is Load - Xmax
+		(is_list(Load), \+ forall(member(X,Load), X < Xmax), vector_minus1(Load,Xmax,Overload)) ;
+		(number(Load), Load > Xmax , Overload is Load - Xmax) 
 	) .
 
 %%%------MAIN-------
@@ -104,7 +105,7 @@ main :-
 	import,
 	%%findall([Machine,App1,App2,X,Cnt],machine_interference(Machine,App1,App2,X,Cnt),L),
 	member(Resource,[cpu,memory,disk,m,p,mp]),
-	findall([Machine,Resource,Overload,"null","null"],machine_overload(Machine,X,Overload),L),
+	findall([Machine,Resource,Overload,"null","null"],machine_overload(Machine,Resource,Overload),L),
 	output(L) .
 
 main :-
