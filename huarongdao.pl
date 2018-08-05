@@ -73,7 +73,7 @@ machine_interference(Machine,App1,App2,X,Cnt) :-
 	interference(App1,App2,X),
 	Cnt >=  X .
 
-%%%%---------
+%%%---------
 machine_load(Machine,Resource,Load) :-
 	findall(X, (deploy(_,App,Machine), Machine \= empty, app_resource(App,Resource,X)), Xs) ,
 	(list_resource(Xs) -> nvector_sum(Xs,Load) ; sum_list(Xs,Load)).
@@ -86,9 +86,18 @@ machine_overload(Machine,Resource,Overload) :-
 		(number(Load), Load > Xmax , Overload is Load - Xmax) 
 	) .
 
+cpu_score1(X,Score) :-
+	X =< 0.5 -> Score is 1;
+	Score is (1+10*((e ** (X-0.5)) - 1)) / 98 .
 
-	
-	
+cpu_score98(Ls,Score) :-
+	maplist(cpu_score1, Ls,Tmp) , sum_list(Tmp,Score) .
+
+machine_score(Machine,Score) :-
+	machine_overload(Machine,_,_) -> Score is 1000 ;
+	findall(X, (deploy(_,App,Machine), Machine \= empty, app_resource(App,cpu,X)), Xs) ,
+	maplist(cpu_score98,Xs,Tmp) , sum_list(Tmp,Score).
+
 %%%------MAIN-------
 import :-
 	csv_read_file('scheduling_preliminary_app_interference_20180606.csv', INTERS, [functor(interference),arity(3)]) ,
