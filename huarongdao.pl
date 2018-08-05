@@ -1,6 +1,6 @@
 #!/usr/bin/swipl
 :- style_check(-singleton).
-:- initialization main.
+%:- initialization main.
 :- set_prolog_flag(verbose, silent).
 :- use_module(library(csv)).
 
@@ -75,7 +75,7 @@ machine_interference(Machine,App1,App2,X,Cnt) :-
 
 %%%%---------
 machine_load(Machine,Resource,Load) :-
-	setof(X, (deploy(_,App,Machine), Machine \= empty, app_resource(App,Resource,X)), Xs) ,
+	findall(X, (deploy(_,App,Machine), Machine \= empty, app_resource(App,Resource,X)), Xs) ,
 	(list_resource(Xs) -> nvector_sum(Xs,Load) ; sum_list(Xs,Load)).
 
 machine_overload(Machine,Resource,Overload) :-
@@ -86,6 +86,9 @@ machine_overload(Machine,Resource,Overload) :-
 		(number(Load), Load > Xmax , Overload is Load - Xmax) 
 	) .
 
+
+	
+	
 %%%------MAIN-------
 import :-
 	csv_read_file('scheduling_preliminary_app_interference_20180606.csv', INTERS, [functor(interference),arity(3)]) ,
@@ -110,3 +113,8 @@ main :-
 
 main :-
 	halt(1) .
+
+
+uncle(X,Y) :-
+	fater_son(X,Z) ,
+	brother(Z,Y) .
