@@ -55453,7 +55453,7 @@ inst_8066,app_909,empty
 inst_94060,app_642,empty
 inst_88403,app_1067,empty
 inst_68670,app_5376,empty
-inst_17517,app_4825,machine_3613
+inst_17517:- use_module(library(lambda)).,app_4825,machine_3613
 inst_83580,app_1900,empty
 inst_95250,app_2134,empty
 inst_3392,app_6211,empty
