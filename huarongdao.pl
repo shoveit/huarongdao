@@ -54,29 +54,32 @@ machine_interference(Machine,App1,App2,X,Cnt) :-
 	Cnt >  X .
 
 %%%---------
-machine_load(Machine,Resource,Load) :-
+machine_load(Machine,Resource, LoadPercent) :-
 	findall(X, ( Machine \= empty,deploy(_,App,Machine), app_resource(App,Resource,X)), Xs) ,
-	(list_resource(Xs) -> nvector_sum(Xs,Load) ; sum_list(Xs,Load)).
-
-machine_overload(Machine,Resource,Overload) :-
-	machine_load(Machine,Resource,Load),
 	machine_resource(Machine,Resource,Xmax),
-	(
-		(is_list(Load), \+ forall(member(X,Load), X < Xmax), maplist(\X^Y^(Y is X / Xmax),Load, Overload)) ;
-		(number(Load), Load > Xmax , Overload is Load / Xmax) 
-	) .
+	scalar_resource(Xs), machine_resource(Machine,Resource,Xmax), sum_list(Xs,Load) , LoadPercent is Load / Xmax .
+machine_load(Machine,Resource, LoadPercent) :-
+	findall(X, ( Machine \= empty,deploy(_,App,Machine), app_resource(App,Resource,X)), Xs) ,
+	machine_resource(Machine,Resource,Xmax),
+	list_resource(Xs) , (nvector_sum(Xs,Load), maplist(\X^Y^(Y is X / Xmax), Load, LoadPercent)).
+
+%--- always call with instanciated Machine
+machine_overload(Machine,Resource) :-
+	machine_load(Machine,Resource,Load), is_list(Load), \+ forall(member(X,Load), X =< 1) .
+machine_overload(Machine,Resource) :-
+	machine_load(Machine,Resource,Load), number(Load), Load >= 1 .
 
 cpu_score1(X,Score) :-
 	X =< 0.5 -> Score is 0;
 	Score is 10*((e ** (X-0.5)) - 1) / 98 .
 
 machine_score(Machine,100) :-
-	machine_overload(Machine,_,_)  .
+	machine_overload(Machine,_)  .
 machine_score(Machine,1) :-	%%----- empty machine or machine not exist
 	machine_load(Machine,cpu,0) .
 machine_score(Machine,Score) :-
 	%-- penalty score
-	findall(100*(X-Cnt), machine_interference(Machine, App1,App2,Cnt,X), Penalty),
+	findall(100*(Cnt-X), machine_interference(Machine, App1,App2,X,Cnt), Penalty),
 	sum_list(Penalty, PenaltyScore),
 	%-- load score
 	machine_resource(Machine,cpu,Max), machine_load(Machine,cpu,Load),
@@ -84,16 +87,11 @@ machine_score(Machine,Score) :-
 	%-- sum
 	sum_list([1+PenaltyScore|LoadScore] , Score) .
 
-%%cause_machine_interference(Inst,Machine) :-
-%%	deploy(Inst, App, _),
-%%	deploy(_, App_, Machine),
-%%	interference(App_,) .
-
-
-%%-------test: findall([Machine,Inst,App],( deploy(Inst,App,Machine), Machine \= empty), Dispatch) , findall(Move, (nth1(I, Dispatch,Move),I>=10, I=<40),Moves) , member([Machine1,_,_],Moves),member([Machine2,_,_],Moves) , evaluate_move(Inst,Machine1,Machine2,Score,Moves) , Score < 0.
-evaluate_move(Inst,Machine1,Machine2,Score) :-
-	Machine1 \= Machine2, deploy(Inst,App,Machine1),
-	\+ machine_interference(Machine2,_,_,_,_) , 
+%%-------test: findall([Machine,Inst,App],( deploy(Inst,App,Machine), Machine \= empty), Dispatch) , findall(Move, (nth1(I, Dispatch,Move),I>=10, I=<20),Moves) , evaluate_move(Inst,Machine1,Machine2,Score,Moves) .
+evaluate_move(Inst,Machine1,Machine2,Score,Moves) :-
+	deploy(Inst,App,Machine1),
+	member([Machine1,Inst,_] , Moves),	member([Machine2,_,_] , Moves),
+	Machine1 \= Machine2, \+ machine_interference(Machine2,_,_,_,_) , 
 	machine_score(Machine1,Score1), machine_score(Machine2,Score2),
 	retract(deploy(Inst,App,Machine1)), assert(deploy(Inst,App,Machine2)),
 	machine_score(Machine1,Score1_), machine_score(Machine2,Score2_),
