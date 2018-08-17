@@ -1,9 +1,10 @@
 #!/usr/bin/swipl
 :- style_check(-singleton).
-%:- initialization main.
+:- initialization main.
 :- set_prolog_flag(verbose, silent).
 :- use_module(library(csv)).
 :- use_module(library(lambda)).
+%:- use_module(library(prosqlite)).
 
 %%==> scheduling_preliminary_app_resources_20180606.csv <==
 app_resource(App,cpu,CPU) :- app(App,L), findall(E,(nth1(I,L,E),I>=1,I=<98),CPU) .
@@ -119,10 +120,10 @@ main :-
 	%------- test1 
 	%%findall([Machine,App1,App2,X,Cnt],machine_interference(Machine,App1,App2,X,Cnt),L),
 	%------- test2
-	member(Resource,[cpu,memory,disk,m,p,mp]),
-	findall([Machine,Resource,Overload,"null","null"],machine_overload(Machine,Resource,Overload),L),
+	%member(Resource,[cpu,memory,disk,m,p,mp]),
+	%findall([Machine,Resource,Overload,"null","null"],machine_overload(Machine,Resource,Overload),L),
 	%------- test3
-	output(L) .
-
+	%output(L) .
+	
 main :-
 	halt(1) .
