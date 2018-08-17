@@ -1,0 +1,437 @@
+#+TITLE: tianchi_diaodu
+#+AUTHOR: asenal
+#+EMAIL: asenal@localhost.localdomain
+#+OPTIONS: ':nil *:t -:t ::t <:t H:3 \n:nil ^:{} arch:headline
+#+OPTIONS: author:t c:nil creator:comment d:(not "LOGBOOK") date:t
+#+OPTIONS: e:t email:nil f:t inline:t num:t p:nil pri:nil stat:t
+#+OPTIONS: tags:t tasks:t tex:t timestamp:t toc:t todo:t |:t
+#+CREATOR: Emacs 25.2.2 (Org mode 8.2.10)
+#+DESCRIPTION:
+#+EXCLUDE_TAGS: noexport
+#+KEYWORDS:
+#+LANGUAGE: en
+#+SELECT_TAGS: export
+
+* statement
++ 实例（instance）：一个实例是可以被调度到一个机器上的对象，在实际生产中，一个实例可以是一个docker容器
++ 应用分组（App）:一个应用分组包括很多实例（instance）。属于同一个App下的所有实例，具备相同的约束条件。一个实例能且只能属于一个应用分组
++ 机器（Machine）：机器是集群中的服务器，一个实例被可以被调度到一个机器上
+
++ 每个实例都标明了CPU、memory、disk此3个维度的资源需求，其中CPU、memory以分时占用曲线的形式给出，在任意时刻，任意一个宿主机A上，所有部署在宿主机A上的实例的任意资源都不能超过宿主机A的该资源容量
++ 另外还有P、M、PM三类资源，定义了应用实例的重要程度，任意一台宿主机上的部署数目不能超过该类型宿主机能够容纳的重要应用数目上限
++ 混部集群时刻处于复杂的干扰环境中，所以我们需要满足一些规避干扰约束，一条规避干扰约束被描述为<APP_A, APP_B, k>，代表若一台宿主机上存在APP_A类型的实例，则最多能部署k个APP_B类型的实例。注意，k可能为0。APP_A和APP_B也可能代表同一个APP（e.g. <APP_A, APP_A, k>），代表同一台机器上最多可以部署的该APP的实例的数目
+
+* data
+** overview 
+#+BEGIN_SRC sh :results output :exports both
+wc -l *.csv
+#+END_SRC
+
+#+RESULTS:
+:    35242 scheduling_preliminary_app_interference_20180606.csv
+:     9338 scheduling_preliminary_app_resources_20180606.csv
+:    68219 scheduling_preliminary_instance_deploy_20180606.csv
+:     6000 scheduling_preliminary_machine_resources_20180606.csv
+:       11 scheduling_preliminary_submit_sample_20180606.csv
+:   118810 total
+
+#+BEGIN_SRC sh :results output :exports both
+head -3 *.csv 
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+==> scheduling_preliminary_app_interference_20180606.csv <==
+app_8361,app_2163,0
+app_6585,app_8959,0
+app_5732,app_3361,2
+
+==> scheduling_preliminary_app_resources_20180606.csv <==
+app_1,0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|1.117|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.552|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5,6.42160797119|6.42160797119|6.42160797119|6.42160797119|6.39139938354|6.39139938354|6.43355178833|6.34847259521|6.42100143433|6.43319702148|6.42151641846|6.42195129395|6.42176818848|6.48331069946|6.47143554688|6.4729385376|6.47100830078|6.48432540894|6.41958999634|6.41706466675|6.19389724731|6.20727920532|6.47636795044|6.59262466431|6.47202682495|6.48359680176|6.47143554688|6.44570922852|6.44570922852|6.431640625|6.41646194458|6.41654968262|6.4165725708|6.42808914185|6.41634750366|6.41942977905|6.61102294922|6.6219329834|6.62218475342|6.60978317261|6.60957336426|6.62376785278|6.62400054932|6.61197662354|6.61205673218|6.61199188232|6.61199188232|6.61199188232|6.61199188232|6.56122970581|6.54928207397|6.49227905273|6.49227905273|6.49227905273|6.49227905273|6.43252182007|6.59106063843|6.60294723511|6.60347366333|6.59328460693|6.59231567383|6.60480117798|6.60498809814|6.60401535034|6.58766555786|6.59936523438|6.59970092773|6.58800888062|6.58840942383|6.60182189941|6.60073852539|6.57892227173|6.57911682129|6.57929229736|6.43476104736|6.37935256958|6.56474304199|6.56474304199|6.56474304199|6.56474304199|6.56474304199|6.56474304199|6.56474304199|6.58026123047|6.58026123047|6.58026123047|6.58026123047|6.58026123047|6.58026123047|6.58026123047|6.58026123047|6.49108886719|6.49108886719|6.49156570435|6.49156570435|6.49156570435|6.49156570435|6.37732315063,60,0,0,0
+app_2,0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5,4.39343643188|4.39361572266|4.41985321045|4.40575790405|4.39363861084|4.39352035522|4.39332580566|4.4055480957|4.37074661255|4.37077713013|4.39336776733|4.40601730347|4.41326522827|4.39426040649|4.41846847534|4.40608978271|4.40682983398|4.3981590271|4.41686630249|4.41249847412|4.39656448364|4.39673995972|4.39665222168|4.40844345093|4.40034866333|4.3973236084|4.41262817383|4.40634155273|4.41729736328|4.39444351196|4.39430236816|4.40585708618|4.40650939941|4.29821014404|4.29782104492|3.83311462402|4.37056350708|4.37157821655|4.38321685791|4.37166976929|4.40224838257|4.40253448486|4.39451980591|4.40699005127|4.37554931641|4.37600708008|4.38756942749|4.37280654907|3.70436096191|3.71706390381|4.39459991455|4.40732192993|4.39538192749|4.39529800415|4.39518737793|4.40699768066|4.3953666687|4.39574432373|4.39546585083|3.90528488159|3.90556335449|3.9154624939|3.90605163574|4.3784866333|4.37857818604|4.37875747681|4.39056396484|4.37844848633|4.37844848633|4.39248275757|4.39301300049|4.40493011475|4.39325714111|4.39346313477|4.39353561401|4.40582275391|4.3935585022|4.3935585022|4.3935585022|4.3935585022|4.3935585022|4.2318611145|4.24509048462|4.24509048462|3.94774627686|3.94774627686|4.29042053223|4.30331420898|3.03238677979|3.0319442749|3.0319442749|3.07940673828|3.07940673828|3.07940673828|3.07940673828|3.07940673828|3.07940673828|3.07940673828,60,0,0,0
+app_3,0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5|0.5,4.73516845703|4.77767562866|4.73485565186|4.74645614624|4.73520278931|5.30903625488|5.30878448486|5.29749298096|4.73229980469|4.74235534668|5.34213638306|5.34279632568|4.72992324829|4.74237442017|4.74457931519|4.73296737671|4.72161102295|4.75710678101|4.72206497192|4.76247787476|4.76138687134|4.75022888184|4.75120925903|4.76916122437|4.76305007935|4.76215362549|4.77484512329|4.76288986206|4.76414489746|4.76340484619|4.77508544922|4.77725982666|4.68332290649|4.55593490601|4.35255432129|4.5976524353|4.59797286987|4.59803009033|4.78452301025|4.56674957275|4.02941894531|4.73958206177|4.07461547852|4.08892822266|4.62316131592|4.63676834106|4.11294555664|3.77402114868|3.78771209717|4.67507171631|4.77871322632|4.69095230103|4.80958175659|4.67874908447|4.68031311035|4.69097137451|4.67922592163|4.6805305481|4.67962646484|4.47253036499|5.29919433594|5.31118011475|5.31233978271|4.70178985596|4.65930175781|4.73584747314|4.7403793335|3.48498153687|4.11815261841|5.35206604004|4.71771621704|4.76713943481|4.18058395386|5.00675582886|4.70384979248|3.61239624023|4.7780456543|3.61404418945|3.61463928223|3.71308135986|3.72710418701|4.05332565308|4.0672454834|3.20446014404|4.51682662964|4.49272155762|4.32711410522|4.6224822998|3.48746490479|3.49853515625|4.70981216431|5.40101242065|5.40101242065|3.48645782471|3.48645782471|3.48645782471|3.37158584595|3.38552856445,60,0,0,0
+
+==> scheduling_preliminary_instance_deploy_20180606.csv <==
+inst_157,app_50,
+inst_1837,app_3654,
+inst_23673,app_3486,machine_4959
+
+==> scheduling_preliminary_machine_resources_20180606.csv <==
+machine_1,32,64,600,7,3,7
+machine_2,32,64,600,7,3,7
+machine_3,32,64,600,7,3,7
+
+==> scheduling_preliminary_submit_sample_20180606.csv <==
+inst_101, machine_1
+inst_102, machine_2
+inst_103, machine_3
+#+end_example
+
+** count of deployed APP
+#+BEGIN_SRC sh
+awk -F"," 'length($3)>0' scheduling_preliminary_instance_deploy_20180606.csv |wc -l
+#+END_SRC
+
+#+RESULTS:
+: 29996
+
+
+* ETL
+** ontology upload
+#+BEGIN_SRC sh :results output :exports both
+cat /home/asenal/TBCFreeWorkspace/tianchiMachineDispatch/machinedispatch.ttl
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+# baseURI: http://tianchi.com/machinedispatch
+# prefix: machinedispatch
+
+@prefix : <http://tianchi.com/machinedispatch#> .
+@prefix machinedispatch: <http://tianchi.com/machinedispatch#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://tianchi.com/machinedispatch>
+  rdf:type owl:Ontology ;
+  owl:versionInfo "Created By YQL" ;
+.
+:A
+  rdf:type owl:ObjectProperty ;
+  rdfs:domain :ConflictRule ;
+  rdfs:range :Machine ;
+.
+:App
+  rdf:type owl:Class ;
+  rdfs:subClassOf owl:Thing ;
+.
+:B
+  rdf:type owl:ObjectProperty ;
+  rdfs:domain :ConflictRule ;
+  rdfs:range :Machine ;
+.
+:ConflictRule
+  rdf:type owl:Class ;
+  rdfs:subClassOf :Rule ;
+.
+:Instance
+  rdf:type owl:Class ;
+  rdfs:subClassOf owl:Thing ;
+.
+:M
+  rdf:type owl:DatatypeProperty ;
+  rdfs:subPropertyOf :disk ;
+.
+:Machine
+  rdf:type owl:Class ;
+  rdfs:subClassOf owl:Thing ;
+.
+:Occupied
+  rdf:type owl:Class ;
+  rdfs:subClassOf :Machine ;
+.
+:P
+  rdf:type owl:DatatypeProperty ;
+  rdfs:subPropertyOf :disk ;
+.
+:PM
+  rdf:type owl:DatatypeProperty ;
+  rdfs:domain :Request ;
+  rdfs:subPropertyOf :disk ;
+.
+:Request
+  rdf:type owl:Class ;
+  rdfs:subClassOf owl:Thing ;
+.
+:Rule
+  rdf:type owl:Class ;
+  rdfs:subClassOf owl:Thing ;
+.
+:Unoccupied
+  rdf:type owl:Class ;
+  rdfs:subClassOf :Machine ;
+.
+:X
+  rdf:type owl:DatatypeProperty ;
+  rdfs:domain :ConflictRule ;
+  rdfs:range xsd:integer ;
+.
+:consumer
+  rdf:type rdf:Property ;
+  rdfs:domain :Request ;
+  rdfs:range :Instance ;
+.
+:cpu
+  rdf:type owl:DatatypeProperty ;
+  rdfs:domain :Machine ;
+  rdfs:subPropertyOf :resource ;
+.
+:deployTo
+  rdf:type owl:FunctionalProperty ;
+  rdfs:domain :Instance ;
+  rdfs:range :Machine ;
+.
+:disk
+  rdf:type owl:DatatypeProperty ;
+  rdfs:domain :Machine ;
+  rdfs:range xsd:integer ;
+  rdfs:subPropertyOf :resource ;
+.
+:memory
+  rdf:type owl:DatatypeProperty ;
+  rdfs:domain :Machine ;
+  rdfs:subPropertyOf :resource ;
+.
+:producer
+  rdf:type rdf:Property ;
+  rdfs:domain :Request ;
+  rdfs:range :Machine ;
+.
+:quota
+  rdf:type owl:DatatypeProperty ;
+  rdfs:domain :Request ;
+.
+:resource
+  rdf:type owl:DatatypeProperty ;
+.
+:deployTo
+  rdf:type owl:FunctionalProperty ;
+  rdfs:domain :Instance ;
+  rdfs:range :Machine ;
+  owl:inverseOf :supply ;
+.
+:supply
+  rdf:type owl:FunctionalProperty ;
+  rdfs:domain :Machine ;
+  rdfs:range :Instance ;
+  owl:inverseOf :deployTo ;
+.
+:timeslot
+  rdf:type owl:DatatypeProperty ;
+  rdfs:domain :Request ;
+  rdfs:range xsd:integer ;
+.
+:Occupied
+  rdf:type owl:Class ;
+  rdfs:subClassOf
+  [a owl:Restriction ;
+   owl:onProperty :supply ;
+   owl:minCardinality "1"^^<http://www.w3.org/20901/XMLSchema#int>
+   ]
+.
+#+end_example
+
+#+BEGIN_SRC sh :exports both :results output
+cat /home/asenal/TBCFreeWorkspace/tianchiMachineDispatch/machinedispatch.ttl | /home/asenal/BIN/agraph-6.4.1/bin/agload diaodu -i ttl  -e ignore - --supersede -g "<http://tianchi.com#tbox>"
+#+END_SRC
+
+#+RESULTS:
+
+** app_interfence2nt
+#+BEGIN_SRC sh :results output :exports both
+cat scheduling_preliminary_app_interference_20180606.csv |\
+	awk -F"," '{
+			    printf("<BASE#rule-%s_%s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <BASE#Rule>\n" ,$1,$2);\
+                printf("<BASE#rule-%s_%s> <BASE#A> <BASE#%s>\n" ,$1 ,$2, $1);\
+			    printf("<BASE#rule-%s_%s> <BASE#B> <BASE#%s>\n" ,$1,$2,$2);\
+				printf("<BASE#rule-%s_%s> <BASE#X> \"%s\"^^<XML#integer>\n" ,$1,$2,$3)}' |  \
+sed 's/BASE/http:\/\/tianchi.com\/machinedispatch/g;s/XML/http:\/\/www.w3.org\/2001\/XMLSchema/g' |awk '!a[$0]++'| /home/asenal/BIN/agraph-6.4.1/bin/agload diaodu -i nt  -e ignore - 
+#+END_SRC
+
+#+RESULTS:
+
+** app_resources2nt
+*** 2AG
+#+BEGIN_SRC sh
+head -1 scheduling_preliminary_app_resources_20180606.csv  |\
+	awk -F"," '{app=$1;split($2,cpu,"|");split($3,memory,"|");disk=$4;P=$5;M=$6;PM=$7;\
+   			    for(i=1;i<=98;i++){ \
+			    printf("<BASE#request-%s-%s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <BASE#Request>\n" ,app,i);\
+			  	printf("<BASE#request-%s-%s> <BASE#consumer> <BASE#%s>\n" ,app,i,app);\
+				printf("<BASE#request-%s-%s> <BASE#timeslot> \"%s\"^^<XML#integer>\n" ,app,i,i);\
+				printf("<BASE#request-%s-%s> <BASE#cpu> \"%s\"^^<XML#float>\n" ,app,i,cpu[i]);\
+				printf("<BASE#request-%s-%s> <BASE#memory> \"%s\"^^<XML#float>\n" ,app,i,memory[i]);\
+
+				printf("<BASE#request-%s-%s> <BASE#P> \"%s\"^^<XML#float>\n" ,app,i,P);\
+				printf("<BASE#request-%s-%s> <BASE#M> \"%s\"^^<XML#float>\n" ,app,i,M);\
+				printf("<BASE#request-%s-%s> <BASE#PM> \"%s\"^^<XML#float>\n" ,app,i,PM);\
+				}}' |\
+sed 's/BASE/http:\/\/tianchi.com\/machinedispatch/g;s/XML/http:\/\/www.w3.org\/2001\/XMLSchema/g' |awk '!a[$0]++'| /home/asenal/BIN/agraph-6.4.1/bin/agload diaodu2 -i nt  -e ignore -  --supersede
+#+END_SRC
+*** 2Prolog
+
+#+BEGIN_SRC sh :results output
+cat scheduling_preliminary_app_resources_20180606.csv  |\
+	awk -F"," '{app=$1;cpu=$2;memory=$3;disk=$4;P=$5;M=$6;PM=$7;gsub("\\|", ",", cpu); gsub("\\|", ",", memory);\
+                printf("app_resource(%s,cpu,[%s]) .\n",app,cpu);\
+                printf("app_resource(%s,memory,[%s]) .\n",app,memory);\
+                printf("app_resource(%s,disk,%s) .\n",app,disk);\
+                printf("app_resource(%s,p,%s) .\n",app,P);\
+                printf("app_resource(%s,m,%s) .\n",app,M);\
+                printf("app_resource(%s,pm,%s) .\n",app,PM);\
+				}'  > scheduling_preliminary_app_resources_20180606.pl
+#+END_SRC
+
+
+** machine_resources2nt
+#+BEGIN_SRC sh
+head scheduling_preliminary_machine_resources_20180606.csv 
+#+END_SRC
+
+#+RESULTS:
+| machine_1  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_2  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_3  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_4  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_5  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_6  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_7  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_8  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_9  | 32 | 64 | 600 | 7 | 3 | 7 |
+| machine_10 | 32 | 64 | 600 | 7 | 3 | 7 |
+
+*** 2AG
+#+BEGIN_SRC sh
+cat scheduling_preliminary_machine_resources_20180606.csv |\
+	awk -F"," '{machine=$1;cpu=$2;memory=$3;disk=$4;P=$5;M=$6;PM=$7;\
+			   printf("<BASE#%s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <BASE#Machine>\n" ,machine);\
+			   printf("<BASE#%s> <BASE#cpu> \"%s\"^^<XML#float>\n" ,machine,cpu);\
+			   printf("<BASE#%s> <BASE#memory> \"%s\"^^<XML#float>\n" ,machine,memory);\
+			   printf("<BASE#%s> <BASE#P> \"%s\"^^<XML#integer>\n" ,machine,P);\
+			   printf("<BASE#%s> <BASE#M> \"%s\"^^<XML#integer>\n" ,machine,M);\
+			   printf("<BASE#%s> <BASE#PM> \"%s\"^^<XML#integer>\n" ,machine,PM);\
+			   printf("<BASE#%s> <BASE#disk> \"%s\"^^<XML#float>\n" ,machine,disk);}'  |\
+sed 's/BASE/http:\/\/tianchi.com\/machinedispatch/g;s/XML/http:\/\/www.w3.org\/2001\/XMLSchema/g' | awk '!a[$0]++'| /home/asenal/BIN/agraph-6.4.1/bin/agload diaodu -i nt  -e ignore - 
+#+END_SRC
+
+*** 2Prolog
+#+BEGIN_SRC sh :results output
+cat scheduling_preliminary_machine_resources_20180606.csv |\
+awk -F"," '{machine=$1;cpu=$2;memory=$3;disk=$4;P=$5;M=$6;PM=$7;\
+		   printf("machine_resource(%s,cpu,%s) .\n",machine,cpu);\
+		   printf("machine_resource(%s,memory,%s) .\n",machine,memory);\
+		   printf("machine_resource(%s,disk,%s) .\n",machine,disk);\
+		   printf("machine_resource(%s,m,%s) .\n",machine,m);\
+		   printf("machine_resource(%s,p,%s) .\n",machine,p);\
+		   printf("machine_resource(%s,pm,%s) .\n",machine,pm)}'\
+> scheduling_preliminary_machine_resources_20180606.pl
+#+END_SRC
+
+#+RESULTS:
+
+** instance_deploy2nt
+#+BEGIN_SRC sh
+cat scheduling_preliminary_instance_deploy_20180606.csv |
+	awk -F"," '{instance=$1;app=$2;machine=$3;\
+			    printf("<BASE#%s> <BASE#deployTo> <BASE#%s>\n" ,app,instance);
+			    printf("<BASE#%s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <BASE#Instance>\n" ,instance);
+			    printf("<BASE#%s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <BASE#App>\n" ,app);
+				if(length($3)>0){
+			  	  printf("<BASE#%s> <BASE#runningOn> <BASE#%s>\n" ,instance,machine);\
+				}}' |\
+sed 's/BASE/http:\/\/tianchi.com\/machinedispatch/g;s/XML/http:\/\/www.w3.org\/2001\/XMLSchema/g' |awk '!a[$0]++'| /home/asenal/BIN/agraph-6.4.1/bin/agload diaodu -i nt  -e ignore - 
+#+END_SRC
+
+* DATAOPEN and DASHBOARD
+** machine usage
+#+BEGIN_SRC sh
+echo 'query=
+PREFIX diaodu: <http://tianchi.com/machinedispatch#>
+select (count(?occupied_machine) as ?occupied_machine_cnt) (count(?machine) as ?machine_cnt) {
+?machine rdf:type diaodu:Machine .
+?instance  
+?_ diaodu:runningOn ?occupied_machine .
+}  '  |  curl -u super:123 localhost:10035/repositories/diaodu -X POST -d @- -H 'accept: text/tab-separated-values'
+
+#+END_SRC
+
+
+
+#+BEGIN_SRC sh
+echo 'query=
+PREFIX diaodu: <http://tianchi.com/machinedispatch#>
+SELECT ?machine (count(distinct ?app) as ?app_cnt)
+{
+  ?app diaodu:deployTo ?instance .
+  ?instance diaodu:runningOn ?machine .
+
+} group by ?machine '  |  curl -u super:123 localhost:10035/repositories/diaodu -X POST -d @- -H 'accept: text/tab-separated-values'   
+#+END_SRC
+
+
+* Prolog 
+** conflict machine
+#+BEGIN_SRC sh
+select ?machine ?app1 ?app2 ?cnt ?X
+{
+?machine a diaodu:Machine .
+?instance1 a diaodu:Instance .
+?instance2 a diaodu:Instance .
+?app1 a diaodu:App .
+?app2 a diaodu:App .
+
+?instance1 diaodu:runningOn ?machine .
+?app1 diaodu:deployTo ?instance .
+
+?instance2 diaodu:runningOn ?machine .
+?app2 diaodu:deployTo ?instance .
+
+?_ diaodu:A ?app1;
+diaodu:B ?app2;
+diaodu:X ?X .
+FILTER(?cnt > ?X)
+}
+
+#+END_SRC
+
+#+BEGIN_SRC sh
+select ?machine ?app1 ?app2 ?cnt ?X
+{
+?instance1 diaodu:runningOn ?machine .
+?app1 diaodu:deployTo ?instance .
+
+?instance2 diaodu:runningOn ?machine .
+?app2 diaodu:deployTo ?instance .
+
+?_ diaodu:A ?app1;
+diaodu:B ?app2;
+diaodu:X ?X .
+FILTER(?cnt > ?X)
+} 
+#+END_SRC
+
+Executing query failed: QUERY MEMORY LIMIT REACHED: This AllegroGraph process is using or is about to use more memory than allowed. An allocation request of 1.0 GiB would make private memory usage 9.7 GiB. This is 127.6% of RAM, which exceeds the memoryExhaustionWarningPercentage query option (90.0%). 
+
+#+BEGIN_SRC sh
+select  ?app1 ?app2 ?cnt ?X
+{
+?instance1 diaodu:runningOn diaodu:machine_5055 .
+?app1 diaodu:deployTo ?instance .
+
+?instance2 diaodu:runningOn diaodu:machine_5055 .
+?app2 diaodu:deployTo ?instance .
+
+?_ diaodu:A ?app1;
+diaodu:B ?app2;
+diaodu:X ?X .
+FILTER(?cnt > ?X)
+} 
+#+END_SRC
+
+Executing query failed: QUERY FAILED: This AllegroGraph process was unable to allocate sufficient memory Current Resident Set Size (RSS) is at 1.8% of memory. Total AllegroGraph memory usage is 4,522,820,544. The error was: There isn't enough aclmalloc space left to satisfy a request for 2,919,295,816 bytes. Query plan is: Final plan: (:join (:lhs (:join (:lhs (:graph current (:triple-query <?instance1 diaodu:runningOn diaodu:machine_5055> :estimate 1.050746 :cursor-es...
+
+* AG restful
+#+BEGIN_SRC lisp
+
+#+END_SRC
+
+* TODO [0%] future work
+** TODO Divide & Conq
+A global optimized dispath for all machines-apps is not necessary.
+Assume the global solution is comprised of a few non-overlapping partitions
++ make reasonable partitions
++ move APPS within each partition to the final state, minimize operation sequence , minimize SWAP machines
+
+** TODO gas pipe assembler
